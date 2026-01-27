@@ -109,6 +109,10 @@ export function SendPrivately() {
           if (!signTransaction) {
             throw new Error("Wallet does not support signing transactions. Please connect a compatible wallet.");
           }
+          const sim = await connection.simulateTransaction(tx, { sigVerify: false });
+          if (sim.value.err) {
+            throw new Error(`Deposit simulation failed: ${JSON.stringify(sim.value.err)}. Please try again or reduce the amount.`);
+          }
           return await signTransaction(tx);
         }
       );

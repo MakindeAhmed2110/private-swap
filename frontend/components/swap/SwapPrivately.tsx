@@ -307,6 +307,10 @@ export function SwapPrivately() {
                 fundTx.recentBlockhash = fundBlockhash;
                 fundTx.feePayer = publicKey;
 
+                const fundSim = await connection.simulateTransaction(fundTx, { sigVerify: false });
+                if (fundSim.value.err) {
+                  throw new Error(`Funding transaction simulation failed: ${JSON.stringify(fundSim.value.err)}. Cannot safely proceed.`);
+                }
                 const signedFundTx = await signTransaction(fundTx);
                 const fundSignature = await connection.sendRawTransaction(signedFundTx.serialize(), {
                   skipPreflight: false,
@@ -320,7 +324,7 @@ export function SwapPrivately() {
           }
         }
 
-        // 2. Get quote for swap from ephemeral wallet (with platform fee)
+        // 2. Get quote for swap from ephemeral wallet
         toast.loading("Getting swap quote...", { id: "swap" });
         setSwapStatus("Getting swap quote");
         const quote = await jupiterAPI.getQuote({
@@ -609,6 +613,10 @@ export function SwapPrivately() {
               if (!signTransaction) {
                 throw new Error("Wallet does not support signing transactions. Please connect a compatible wallet.");
               }
+              const sim = await connection.simulateTransaction(tx, { sigVerify: false });
+              if (sim.value.err) {
+                throw new Error(`Deposit simulation failed: ${JSON.stringify(sim.value.err)}. Please try again or reduce the amount.`);
+              }
               return await signTransaction(tx);
             }
           );
@@ -627,6 +635,10 @@ export function SwapPrivately() {
               if (!signTransaction) {
                 throw new Error("Wallet does not support signing transactions. Please connect a compatible wallet.");
               }
+              const sim = await connection.simulateTransaction(tx, { sigVerify: false });
+              if (sim.value.err) {
+                throw new Error(`Deposit simulation failed: ${JSON.stringify(sim.value.err)}. Please try again or reduce the amount.`);
+              }
               return await signTransaction(tx);
             }
           );
@@ -644,6 +656,10 @@ export function SwapPrivately() {
             async (tx: VersionedTransaction) => {
               if (!signTransaction) {
                 throw new Error("Wallet does not support signing transactions. Please connect a compatible wallet.");
+              }
+              const sim = await connection.simulateTransaction(tx, { sigVerify: false });
+              if (sim.value.err) {
+                throw new Error(`Deposit simulation failed: ${JSON.stringify(sim.value.err)}. Please try again or reduce the amount.`);
               }
               return await signTransaction(tx);
             }
@@ -729,6 +745,10 @@ export function SwapPrivately() {
                   fundTx.recentBlockhash = fundBlockhash;
                   fundTx.feePayer = publicKey;
 
+                  const fundSim = await connection.simulateTransaction(fundTx, { sigVerify: false });
+                  if (fundSim.value.err) {
+                    throw new Error(`Funding transaction simulation failed: ${JSON.stringify(fundSim.value.err)}. Cannot safely proceed.`);
+                  }
                   const signedFundTx = await signTransaction(fundTx);
                   const fundSignature = await connection.sendRawTransaction(signedFundTx.serialize(), {
                     skipPreflight: false,
@@ -743,7 +763,7 @@ export function SwapPrivately() {
           }
         }
 
-        // Step 3: Get quote and swap from ephemeral wallet (with platform fee)
+        // Step 3: Get quote and swap from ephemeral wallet
         toast.loading("Step 3/5: Getting swap quote...", { id: "swap" });
         setSwapStatus("Step 3/5: Getting swap quote");
         const quote = await jupiterAPI.getQuote({
