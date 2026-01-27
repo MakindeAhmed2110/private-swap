@@ -1,9 +1,13 @@
 /**
  * Platform fee configuration for swap transactions
+ *
+ * Jupiter requires feeAccount to be an *initialized token account* (ATA for the output mint),
+ * not the wallet. The platform fee wallet must have an ATA for each supported output mint
+ * (USDC, USDT, wSOL, ZEC, ORE, STORE) or swaps to that output will fail with 6025 InvalidTokenAccount.
  */
 import { PublicKey } from "@solana/web3.js";
 
-// Platform fee wallet address - receives swap fees
+// Platform fee wallet address - receives swap fees (ATAs for each output mint must exist)
 export const PLATFORM_FEE_WALLET = new PublicKey("6bNkzakJCxVgGYXsLKpdQvxd4zoD7uCijvs3ixF5XffJ");
 
 // Platform fee rate in basis points (25 = 0.25%, 50 = 0.5%, etc.)

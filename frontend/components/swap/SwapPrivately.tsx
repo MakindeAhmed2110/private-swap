@@ -23,8 +23,6 @@ import { deriveEphemeralWallet } from "@/lib/ephemeral-wallet";
 import { getPublicTokenBalance } from "@/lib/wallet-balance";
 import { checkEphemeralWalletBalance, recoverSOLFromEphemeralWallet, checkEphemeralTokenBalance, recoverTokenFromEphemeralWallet } from "@/lib/recover-ephemeral-funds";
 import { Wallet } from "lucide-react";
-import { PLATFORM_FEE_WALLET, PLATFORM_FEE_BPS, getPlatformFeePercentage } from "@/lib/platform-fee-config";
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export function SwapPrivately() {
@@ -257,45 +255,6 @@ export function SwapPrivately() {
         // Ensure ephemeral wallet has enough SOL for transaction fees
         // Jupiter swaps can require 0.03-0.05 SOL for fees, especially for complex routes
         const solForFees = 0.03; // 0.03 SOL buffer for fees (will be returned after swap)
-
-        // Robustness: Wait for funds to be visible in the ephemeral wallet (handle RPC race conditions)
-        let retries = 0;
-        const maxRetries = 10;
-        let fundsConfirmed = false;
-
-        while (retries < maxRetries && !fundsConfirmed) {
-          if (inputToken === "SOL") {
-            const balance = await connection.getBalance(ephemeralAddress);
-            if (balance > 0) {
-              fundsConfirmed = true;
-            }
-          } else {
-            // Check SPL token balance
-            try {
-              const { getAssociatedTokenAddress, getAccount } = await import("@solana/spl-token");
-              const tokenInfo = PRIVACY_CASH_TOKENS[inputToken];
-              const ephemeralTokenAccount = await getAssociatedTokenAddress(
-                new PublicKey(tokenInfo.mint),
-                ephemeralAddress
-              );
-              const accountInfo = await connection.getAccountInfo(ephemeralTokenAccount);
-              if (accountInfo) {
-                const { amount } = await getAccount(connection, ephemeralTokenAccount);
-                if (Number(amount) > 0) {
-                  fundsConfirmed = true;
-                }
-              }
-            } catch (e) {
-              // Ignore errors, just retry
-            }
-          }
-
-          if (!fundsConfirmed) {
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s
-            retries++;
-          }
-        }
-
         const ephemeralBalance = await connection.getBalance(ephemeralAddress);
 
         // If swapping SOL, the withdrawn amount is the swap amount, so we need ADDITIONAL SOL for fees
@@ -369,10 +328,9 @@ export function SwapPrivately() {
           outputMint: PRIVACY_CASH_TOKENS[outputToken].mint,
           amount: amountInBaseUnits,
           slippageBps: 50,
-          platformFeeBps: PLATFORM_FEE_BPS, // Add platform fee
         });
 
-        // 3. Build swap transaction for ephemeral wallet (with platform fee)
+        // 3. Build swap transaction for ephemeral wallet
         toast.loading("Building swap transaction...", { id: "swap" });
         setSwapStatus("Building swap transaction");
         const swapResponse = await jupiterAPI.buildSwapTransaction({
@@ -380,7 +338,6 @@ export function SwapPrivately() {
           userPublicKey: ephemeralAddress, // Swap from ephemeral wallet
           wrapUnwrapSOL: true,
           dynamicComputeUnitLimit: true,
-          feeAccount: PLATFORM_FEE_WALLET.toString(), // Platform fee wallet
         });
 
         // 4. Sign and execute swap with ephemeral wallet
@@ -404,7 +361,8 @@ export function SwapPrivately() {
 
           if (simulation.value.err) {
             const errorMsg = JSON.stringify(simulation.value.err);
-            throw new Error(`Swap simulation failed: ${errorMsg}. Ephemeral wallet balance: ${finalEphemeralBalanceSol.toFixed(6)} SOL`);
+            const hint6025 = errorMsg.includes("6025") ? " Jupiter 6025 (InvalidTokenAccount): ensure the platform fee ATA for the output mint is initialized." : "";
+            throw new Error(`Swap simulation failed: ${errorMsg}. Ephemeral wallet balance: ${finalEphemeralBalanceSol.toFixed(6)} SOL.${hint6025}`);
           }
 
           // Check if we have enough SOL for the transaction fee
@@ -418,7 +376,7 @@ export function SwapPrivately() {
             );
           }
         } catch (simError: any) {
-          if (simError.message?.includes("simulation")) {
+          if (simError.message?.includes("simulation") || simError.message?.includes("6025")) {
             throw simError; // Re-throw simulation errors
           }
           console.warn("Simulation check failed, proceeding anyway:", simError);
@@ -723,47 +681,6 @@ export function SwapPrivately() {
         await connection.confirmTransaction(withdrawResult.tx, "confirmed");
 
         // For non-SOL swaps, ensure ephemeral wallet has SOL for fees
-        // Jupiter swaps can require 0.03-0.05 SOL for fees, especially for complex routes
-        // (solForFees is defined above)
-
-        // Robustness: Wait for funds to be visible in the ephemeral wallet (handle RPC race conditions)
-        let retries = 0;
-        const maxRetries = 10;
-        let fundsConfirmed = false;
-
-        while (retries < maxRetries && !fundsConfirmed) {
-          if (inputToken === "SOL") {
-            const balance = await connection.getBalance(ephemeralAddress);
-            if (balance > 0) {
-              fundsConfirmed = true;
-            }
-          } else {
-            // Check SPL token balance
-            try {
-              const { getAssociatedTokenAddress, getAccount } = await import("@solana/spl-token");
-              const tokenInfo = PRIVACY_CASH_TOKENS[inputToken];
-              const ephemeralTokenAccount = await getAssociatedTokenAddress(
-                new PublicKey(tokenInfo.mint),
-                ephemeralAddress
-              );
-              const accountInfo = await connection.getAccountInfo(ephemeralTokenAccount);
-              if (accountInfo) {
-                const { amount } = await getAccount(connection, ephemeralTokenAccount);
-                if (Number(amount) > 0) {
-                  fundsConfirmed = true;
-                }
-              }
-            } catch (e) {
-              // Ignore errors, just retry
-            }
-          }
-
-          if (!fundsConfirmed) {
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s
-            retries++;
-          }
-        }
-
         if (inputToken !== "SOL") {
           const ephemeralBalance = await connection.getBalance(ephemeralAddress);
           const solNeeded = solForFees * 1e9;
@@ -834,7 +751,6 @@ export function SwapPrivately() {
           outputMint: PRIVACY_CASH_TOKENS[outputToken].mint,
           amount: amountInBaseUnits,
           slippageBps: 50,
-          platformFeeBps: PLATFORM_FEE_BPS, // Add platform fee
         });
 
         toast.loading("Building swap transaction...", { id: "swap" });
@@ -844,7 +760,6 @@ export function SwapPrivately() {
           userPublicKey: ephemeralAddress, // Swap from ephemeral wallet
           wrapUnwrapSOL: true,
           dynamicComputeUnitLimit: true,
-          feeAccount: PLATFORM_FEE_WALLET.toString(), // Platform fee wallet
         });
 
         toast.loading("Executing swap from ephemeral wallet...", { id: "swap" });
@@ -867,7 +782,8 @@ export function SwapPrivately() {
 
           if (simulation.value.err) {
             const errorMsg = JSON.stringify(simulation.value.err);
-            throw new Error(`Swap simulation failed: ${errorMsg}. Ephemeral wallet balance: ${finalEphemeralBalanceSol.toFixed(6)} SOL. Pair: ${inputToken}->${outputToken}.`);
+            const hint6025 = errorMsg.includes("6025") ? " Jupiter 6025 (InvalidTokenAccount): ensure the platform fee ATA for the output mint is initialized." : "";
+            throw new Error(`Swap simulation failed: ${errorMsg}. Ephemeral wallet balance: ${finalEphemeralBalanceSol.toFixed(6)} SOL.${hint6025}`);
           }
 
           // Check if we have enough SOL for the transaction fee
@@ -881,7 +797,7 @@ export function SwapPrivately() {
             );
           }
         } catch (simError: any) {
-          if (simError.message?.includes("simulation") || simError.message?.includes("Insufficient")) {
+          if (simError.message?.includes("simulation") || simError.message?.includes("Insufficient") || simError.message?.includes("6025")) {
             throw simError; // Re-throw simulation errors
           }
           console.warn("Simulation check failed, proceeding anyway:", simError);
@@ -1421,7 +1337,6 @@ export function SwapPrivately() {
               <div className="text-xs text-gray-600 space-y-1">
                 <p>• Powered by Jupiter for optimal routing</p>
                 <p>• Slippage tolerance: 0.5%</p>
-                <p>• Platform fee: {getPlatformFeePercentage()}%</p>
                 <p>• Network fees apply</p>
               </div>
             </div>
