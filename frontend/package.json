@@ -10,6 +10,7 @@
     "postinstall": "node -e \"const fs=require('fs'),path=require('path');const src='node_modules/@lightprotocol/hasher.rs/dist';const dst='node_modules/@lightprotocol/hasher.rs/dist/browser-fat/es';if(fs.existsSync(src)){try{fs.mkdirSync(dst,{recursive:true});['hasher_wasm_simd_bg.wasm','light_wasm_hasher_bg.wasm'].forEach(f=>{const s=path.join(src,f),d=path.join(dst,f);if(fs.existsSync(s))fs.copyFileSync(s,d);});}catch(e){}}\" && node -e \"const fs=require('fs'),path=require('path');const circuitSrc='node_modules/privacycash/circuit2';const circuitDst='public/circuit2';if(fs.existsSync(circuitSrc)){try{fs.mkdirSync(circuitDst,{recursive:true});['transaction2.wasm','transaction2.zkey'].forEach(f=>{const s=path.join(circuitSrc,f),d=path.join(circuitDst,f);if(fs.existsSync(s))fs.copyFileSync(s,d);});}catch(e){console.error('Failed to copy circuit files:',e);}}\""
   },
   "dependencies": {
+    "pino-pretty": "^10.3.0",
     "@radix-ui/react-dialog": "^1.1.6",
     "@radix-ui/react-slot": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.1.8",
