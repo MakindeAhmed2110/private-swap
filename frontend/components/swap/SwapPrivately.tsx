@@ -307,7 +307,7 @@ export function SwapPrivately() {
                 fundTx.recentBlockhash = fundBlockhash;
                 fundTx.feePayer = publicKey;
 
-                const fundSim = await connection.simulateTransaction(fundTx, { sigVerify: false });
+                const fundSim = await connection.simulateTransaction(fundTx);
                 if (fundSim.value.err) {
                   throw new Error(`Funding transaction simulation failed: ${JSON.stringify(fundSim.value.err)}. Cannot safely proceed.`);
                 }
@@ -745,7 +745,7 @@ export function SwapPrivately() {
                   fundTx.recentBlockhash = fundBlockhash;
                   fundTx.feePayer = publicKey;
 
-                  const fundSim = await connection.simulateTransaction(fundTx, { sigVerify: false });
+                  const fundSim = await connection.simulateTransaction(fundTx);
                   if (fundSim.value.err) {
                     throw new Error(`Funding transaction simulation failed: ${JSON.stringify(fundSim.value.err)}. Cannot safely proceed.`);
                   }
