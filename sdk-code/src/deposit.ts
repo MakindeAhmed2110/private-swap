@@ -8,7 +8,7 @@ import { MerkleTree } from './utils/merkle_tree.js';
 import { EncryptionService, serializeProofAndExtData } from './utils/encryption.js';
 import { Keypair as UtxoKeypair } from './models/keypair.js';
 import { getUtxos, isUtxoSpent } from './getUtxos.js';
-import { FIELD_SIZE, FEE_RECIPIENT, MERKLE_TREE_DEPTH, RELAYER_API_URL, PROGRAM_ID, ALT_ADDRESS } from './utils/constants.js';
+import { FIELD_SIZE, FEE_RECIPIENT, MERKLE_TREE_DEPTH, RELAYER_API_URL, PROGRAM_ID, ALT_ADDRESS, TREASURY_WALLET, DEPOSIT_FEE_BPS } from './utils/constants.js';
 import { useExistingALT } from './utils/address_lookup_table.js';
 import { logger } from './utils/logger.js';
 
@@ -77,19 +77,29 @@ export async function deposit({ lightWasm, storage, keyBasePath, publicKey, conn
         signer = publicKey
     }
 
-    // const amount_in_lamports = amount_in_sol * LAMPORTS_PER_SOL
-    const fee_amount_in_lamports = 0
+    // Calculate fees (0.6% total)
+    // Fee is deducted from the provided amount_in_lamports
+    const input_amount = amount_in_lamports;
+    const treasury_fee = Math.floor((input_amount * DEPOSIT_FEE_BPS) / 10000);
+
+    // Deduct fee from the shielding amount
+    amount_in_lamports = input_amount - treasury_fee;
+    const total_deposit_fee = treasury_fee;
+
+    // We'll handle this fee as a separate transfer in the transaction
+    const fee_amount_in_lamports = 0;
+
     logger.debug('Encryption key generated from user keypair');
     logger.debug(`User wallet: ${signer.toString()}`);
-    logger.debug(`Deposit amount: ${amount_in_lamports} lamports (${amount_in_lamports / LAMPORTS_PER_SOL} SOL)`);
-    logger.debug(`Calculated fee: ${fee_amount_in_lamports} lamports (${fee_amount_in_lamports / LAMPORTS_PER_SOL} SOL)`);
+    logger.debug(`Input amount: ${input_amount} lamports (${input_amount / LAMPORTS_PER_SOL} SOL)`);
+    logger.debug(`Shielding amount: ${amount_in_lamports} lamports, Fee: ${treasury_fee} lamports (0.6% Treasury)`);
 
     // Check wallet balance
     const balance = await connection.getBalance(signer);
     logger.debug(`Wallet balance: ${balance / 1e9} SOL`);
 
-    if (balance < amount_in_lamports + fee_amount_in_lamports) {
-        throw new Error(`Insufficient balance: ${balance / 1e9} SOL. Need at least ${(amount_in_lamports + fee_amount_in_lamports) / LAMPORTS_PER_SOL} SOL.`);
+    if (balance < input_amount) {
+        throw new Error(`Insufficient balance: ${balance / 1e9} SOL. Need at least ${input_amount / LAMPORTS_PER_SOL} SOL for deposit and fees.`);
     }
 
     const { treeAccount, treeTokenAccount, globalConfigAccount } = getProgramAccounts()
@@ -394,10 +404,17 @@ export async function deposit({ lightWasm, storage, keyBasePath, publicKey, conn
     // Create versioned transaction with Address Lookup Table
     const recentBlockhash = await connection.getLatestBlockhash();
 
+    // Create fee transfer instruction
+    const treasuryTransfer = SystemProgram.transfer({
+        fromPubkey: signer,
+        toPubkey: TREASURY_WALLET,
+        lamports: treasury_fee,
+    });
+
     const messageV0 = new TransactionMessage({
         payerKey: signer, // User pays for their own deposit
         recentBlockhash: recentBlockhash.blockhash,
-        instructions: [modifyComputeUnits, depositInstruction],
+        instructions: [modifyComputeUnits, treasuryTransfer, depositInstruction],
     }).compileToV0Message([lookupTableAccount.value]);
 
     let versionedTransaction = new VersionedTransaction(messageV0);

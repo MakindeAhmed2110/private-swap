@@ -8,10 +8,10 @@ import { MerkleTree } from './utils/merkle_tree.js';
 import { EncryptionService, serializeProofAndExtData } from './utils/encryption.js';
 import { Keypair as UtxoKeypair } from './models/keypair.js';
 import { getUtxosSPL, isUtxoSpent } from './getUtxosSPL.js';
-import { FIELD_SIZE, FEE_RECIPIENT, MERKLE_TREE_DEPTH, RELAYER_API_URL, PROGRAM_ID, ALT_ADDRESS, tokens, SplList, Token } from './utils/constants.js';
+import { FIELD_SIZE, FEE_RECIPIENT, MERKLE_TREE_DEPTH, RELAYER_API_URL, PROGRAM_ID, ALT_ADDRESS, tokens, SplList, Token, TREASURY_WALLET, DEPOSIT_FEE_BPS } from './utils/constants.js';
 import { getProtocolAddressesWithMint, useExistingALT } from './utils/address_lookup_table.js';
 import { logger } from './utils/logger.js';
-import { getAssociatedTokenAddress, ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync, getMint, getAccount } from '@solana/spl-token';
+import { getAssociatedTokenAddress, ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync, getMint, getAccount, createTransferCheckedInstruction, createBurnInstruction, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 
 
 // Function to relay pre-signed deposit transaction to indexer backend
@@ -131,22 +131,30 @@ export async function depositSPL({ lightWasm, storage, keyBasePath, publicKey, c
         throw new Error(`Don't deposit more than ${limitAmount} ${token.name.toUpperCase()}`)
     }
 
-    // const base_units = amount_in_sol * units_per_token
-    const fee_base_units = 0
+    // Calculate fees (0.6% total)
+    // Fee is deducted from the provided base_units
+    const input_base_units = base_units;
+    const treasury_fee_base_units = Math.floor((input_base_units * DEPOSIT_FEE_BPS) / 10000);
+
+    // Deduct fee from the shielding amount
+    base_units = input_base_units - treasury_fee_base_units;
+    const total_fee_base_units = treasury_fee_base_units;
+
+    // We'll handle this fee as a separate transfer in the transaction
+    const fee_base_units = 0;
+
     logger.debug('Encryption key generated from user keypair');
     logger.debug(`User wallet: ${signer.toString()}`);
-    logger.debug(`Deposit amount: ${base_units} base_units (${base_units / token.units_per_token}  ${token.name.toUpperCase()})`);
-    logger.debug(`Calculated fee: ${fee_base_units} base_units (${fee_base_units / token.units_per_token}  ${token.name.toUpperCase()})`);
+    logger.debug(`Input amount: ${input_base_units} base_units (${input_base_units / token.units_per_token} ${token.name.toUpperCase()})`);
+    logger.debug(`Shielding amount: ${base_units} base_units, Fee: ${treasury_fee_base_units} base_units (0.6% Treasury)`);
 
     // Check SPL balance
     const accountInfo = await getAccount(connection, signerTokenAccount)
     let balance = Number(accountInfo.amount)
-    logger.debug(`wallet balance: ${balance / token.units_per_token}  ${token.name.toUpperCase()}`);
-    logger.debug('balance', balance)
-    logger.debug('base_units + fee_base_units', base_units + fee_base_units)
+    logger.debug(`wallet balance: ${balance / token.units_per_token} ${token.name.toUpperCase()}`);
 
-    if (balance < (base_units + fee_base_units)) {
-        throw new Error(`Insufficient balance. Need at least ${(base_units + fee_base_units) / token.units_per_token}  ${token.name.toUpperCase()}.`);
+    if (balance < input_base_units) {
+        throw new Error(`Insufficient balance. Need at least ${input_base_units / token.units_per_token} ${token.name.toUpperCase()} for deposit and fees.`);
     }
 
     // Check SOL balance
@@ -478,10 +486,38 @@ export async function depositSPL({ lightWasm, storage, keyBasePath, publicKey, c
     // Create versioned transaction with Address Lookup Table
     const recentBlockhash = await connection.getLatestBlockhash();
 
+    // Create fee instruction
+    const treasuryAta = getAssociatedTokenAddressSync(token.pubkey, TREASURY_WALLET, true);
+
+    // Check if treasury ATA exists, if not add creation instruction
+    const extraInstructions: TransactionInstruction[] = [];
+    try {
+        await getAccount(connection, treasuryAta);
+    } catch (e) {
+        logger.debug('Treasury ATA does not exist, adding creation instruction');
+        extraInstructions.push(
+            createAssociatedTokenAccountInstruction(
+                signer,
+                treasuryAta,
+                TREASURY_WALLET,
+                token.pubkey
+            )
+        );
+    }
+
+    const treasuryTransfer = createTransferCheckedInstruction(
+        signerTokenAccount,
+        token.pubkey,
+        treasuryAta,
+        signer,
+        treasury_fee_base_units,
+        Math.log10(token.units_per_token)
+    );
+
     const messageV0 = new TransactionMessage({
         payerKey: signer, // User pays for their own deposit
         recentBlockhash: recentBlockhash.blockhash,
-        instructions: [modifyComputeUnits, depositInstruction],
+        instructions: [modifyComputeUnits, ...extraInstructions, treasuryTransfer, depositInstruction],
     }).compileToV0Message([lookupTableAccount.value]);
 
 
