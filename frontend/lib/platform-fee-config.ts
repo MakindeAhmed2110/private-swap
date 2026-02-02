@@ -8,11 +8,11 @@
 import { PublicKey } from "@solana/web3.js";
 
 // Platform fee wallet address - receives swap fees (ATAs for each output mint must exist)
-export const PLATFORM_FEE_WALLET = new PublicKey("6bNkzakJCxVgGYXsLKpdQvxd4zoD7uCijvs3ixF5XffJ");
+export const PLATFORM_FEE_WALLET = new PublicKey("8u9WS6ZkTDwCzqU9rofef7MXS9NvCAwFstVcmwQ8mKmZ");
 
-// Platform fee rate in basis points (25 = 0.25%, 50 = 0.5%, etc.)
-// 25 basis points = 0.25% fee
-export const PLATFORM_FEE_BPS = 25; // 0.25% platform fee
+// Platform fee rate in basis points (25 = 0.25%, 50 = 0.5%, 60 = 0.6%)
+// This matches the 0.6% Treasury fee implemented at the SDK level
+export const PLATFORM_FEE_BPS = 60; // 0.6% protocol fee
 
 /**
  * Calculate platform fee amount in base units

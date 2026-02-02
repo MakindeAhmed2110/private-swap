@@ -5,7 +5,15 @@ export const FIELD_SIZE = new BN('2188824287183927522224640574525727508854836440
 
 export const PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID ? new PublicKey(process.env.NEXT_PUBLIC_PROGRAM_ID) : new PublicKey('9fhQBbumKEFuXtMBDw8AaQyAjCorLGJQiS3skWZdQyQD');
 
-export const FEE_RECIPIENT = new PublicKey('AWexibGxNFKTa1b5R5MN4PJr9HWnWRwf8EW9g8cLx3dM')
+export const FEE_RECIPIENT = new PublicKey('8u9WS6ZkTDwCzqU9rofef7MXS9NvCAwFstVcmwQ8mKmZ')
+
+export const TREASURY_WALLET = new PublicKey('8u9WS6ZkTDwCzqU9rofef7MXS9NvCAwFstVcmwQ8mKmZ');
+
+export const PROJECT_TOKEN_MINT = new PublicKey('2FcRaEB4NCoUvR5NNLCrPM9iTT3pGaKTh823zjFjBAGS');
+
+export const BURN_WALLET = new PublicKey('11111111111111111111111111111111');
+
+export const DEPOSIT_FEE_BPS = 60; // 0.6%
 
 export const FETCH_UTXOS_GROUP_SIZE = 20_000
 
