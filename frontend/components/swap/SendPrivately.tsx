@@ -18,6 +18,7 @@ import {
   withdrawTokenFromPrivacyCash,
   getPrivateTokenBalanceDirect,
 } from "@/lib/privacy-cash-helpers";
+import { awardPointsForSwap } from "@/lib/points-api";
 
 export function SendPrivately() {
   const { publicKey, connected, signTransaction } = useWallet();
@@ -126,6 +127,7 @@ export function SendPrivately() {
         },
       });
       setShieldStatus("Shield completed successfully");
+      if (publicKey) awardPointsForSwap(publicKey.toBase58(), result.tx);
 
       // Reset form and refresh balance
       setAmount("");

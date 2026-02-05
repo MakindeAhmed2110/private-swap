@@ -1,6 +1,7 @@
 "use client";
 
 import { WalletButton } from "@/components/counter/WalletButton";
+import { PointsDisplay } from "@/components/points/PointsDisplay";
 import { SendPrivately } from "@/components/swap/SendPrivately";
 import { SwapPrivately } from "@/components/swap/SwapPrivately";
 import { useState } from "react";
@@ -103,7 +104,8 @@ export default function Home() {
               )}
             </div>
 
-            {/* Wallet Button - Always Visible */}
+            {/* Points + Wallet */}
+            <PointsDisplay />
             <div className="scale-90 sm:scale-100">
               <WalletButton />
             </div>

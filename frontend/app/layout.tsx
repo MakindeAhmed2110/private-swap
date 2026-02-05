@@ -4,6 +4,7 @@ import "@solana/wallet-adapter-react-ui/styles.css";
 import localFont from "next/font/local";
 
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { SolanaProvider } from "@/components/counter/provider/Solana";
 import { Toaster } from "sonner";
 
@@ -48,6 +49,7 @@ export default function RootLayout({
             }}
           />
         </SolanaProvider>
+        <Analytics />
       </body>
     </html>
   );
