@@ -22,6 +22,10 @@ import {
 import { deriveEphemeralWallet } from "@/lib/ephemeral-wallet";
 import { getPublicTokenBalance } from "@/lib/wallet-balance";
 import { checkEphemeralWalletBalance, recoverSOLFromEphemeralWallet, checkEphemeralTokenBalance, recoverTokenFromEphemeralWallet } from "@/lib/recover-ephemeral-funds";
+import { awardPointsForSwap } from "@/lib/points-api";
+import { PLATFORM_FEE_WALLET, PLATFORM_FEE_BPS } from "@/lib/platform-fee-config";
+import { getTokenPriceUsd } from "@/lib/jupiter-api";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { Wallet } from "lucide-react";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -332,16 +336,20 @@ export function SwapPrivately() {
           outputMint: PRIVACY_CASH_TOKENS[outputToken].mint,
           amount: amountInBaseUnits,
           slippageBps: 50,
+          platformFeeBps: PLATFORM_FEE_BPS,
         });
 
         // 3. Build swap transaction for ephemeral wallet
         toast.loading("Building swap transaction...", { id: "swap" });
         setSwapStatus("Building swap transaction");
+        const outputMintForFee = new PublicKey(PRIVACY_CASH_TOKENS[outputToken].mint);
+        const feeAccount = await getAssociatedTokenAddress(outputMintForFee, PLATFORM_FEE_WALLET);
         const swapResponse = await jupiterAPI.buildSwapTransaction({
           quoteResponse: quote,
           userPublicKey: ephemeralAddress, // Swap from ephemeral wallet
           wrapUnwrapSOL: true,
           dynamicComputeUnitLimit: true,
+          feeAccount: feeAccount.toBase58(),
         });
 
         // 4. Sign and execute swap with ephemeral wallet
@@ -539,6 +547,11 @@ export function SwapPrivately() {
           },
         });
         setSwapStatus("Private swap completed");
+        if (publicKey) {
+          const priceUsd = await getTokenPriceUsd(PRIVACY_CASH_TOKENS[outputToken].mint);
+          const volumeUsd = outputAmountInTokenUnits * priceUsd;
+          awardPointsForSwap(publicKey.toBase58(), swapSignature, volumeUsd);
+        }
       } else if (hasPublicBalance) {
         // FULL PRIVATE SWAP FROM PUBLIC BALANCE (Automatic):
         // 1. Deposit public balance → Privacy Cash
@@ -771,15 +784,19 @@ export function SwapPrivately() {
           outputMint: PRIVACY_CASH_TOKENS[outputToken].mint,
           amount: amountInBaseUnits,
           slippageBps: 50,
+          platformFeeBps: PLATFORM_FEE_BPS,
         });
 
         toast.loading("Building swap transaction...", { id: "swap" });
         setSwapStatus("Building swap transaction");
+        const outputMintForFee = new PublicKey(PRIVACY_CASH_TOKENS[outputToken].mint);
+        const feeAccount = await getAssociatedTokenAddress(outputMintForFee, PLATFORM_FEE_WALLET);
         const swapResponse = await jupiterAPI.buildSwapTransaction({
           quoteResponse: quote,
           userPublicKey: ephemeralAddress, // Swap from ephemeral wallet
           wrapUnwrapSOL: true,
           dynamicComputeUnitLimit: true,
+          feeAccount: feeAccount.toBase58(),
         });
 
         toast.loading("Executing swap from ephemeral wallet...", { id: "swap" });
@@ -996,6 +1013,11 @@ export function SwapPrivately() {
           },
         });
         setSwapStatus("Private swap completed");
+        if (publicKey) {
+          const priceUsd = await getTokenPriceUsd(PRIVACY_CASH_TOKENS[outputToken].mint);
+          const volumeUsd = outputAmountInTokenUnits * priceUsd;
+          awardPointsForSwap(publicKey.toBase58(), swapSignature, volumeUsd);
+        }
       } else {
         toast.error("Insufficient balance", {
           description: "Please ensure you have enough tokens",

@@ -8,12 +8,29 @@ import { Connection, PublicKey, VersionedTransaction } from "@solana/web3.js";
 // Documentation: https://dev.jup.ag/docs/swap/get-quote
 const JUPITER_API_BASE = "https://api.jup.ag/swap/v1";
 
+const JUPITER_PRICE_BASE = "https://api.jup.ag/price/v3";
+
 /**
  * Get Jupiter API key from environment variable
  */
 function getJupiterApiKey(): string | null {
   if (typeof window === "undefined") return null;
   return process.env.NEXT_PUBLIC_JUPITER_API_KEY || null;
+}
+
+/**
+ * Fetch USD price for a token mint from Jupiter Price API v3.
+ * Returns price per token (e.g. 200 for SOL) or 0 if unavailable.
+ */
+export async function getTokenPriceUsd(mint: string): Promise<number> {
+  const headers: HeadersInit = {};
+  const apiKey = getJupiterApiKey();
+  if (apiKey) headers["x-api-key"] = apiKey;
+  const res = await fetch(`${JUPITER_PRICE_BASE}?ids=${encodeURIComponent(mint)}`, { headers });
+  if (!res.ok) return 0;
+  const data = (await res.json()) as Record<string, { usdPrice?: number } | undefined>;
+  const entry = data[mint];
+  return entry?.usdPrice ?? 0;
 }
 
 export interface JupiterQuoteResponse {
