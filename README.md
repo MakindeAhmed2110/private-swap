@@ -120,6 +120,24 @@ All circuits have been audited by Zigtur Security:
 
 ---
 
+## Roadmap
+
+**Near term**
+- Expand multi-token support (additional SPL tokens)
+- Improved UX for shield / unshield flow and swap confirmation
+- Mobile-friendly experience and wallet support
+
+**Next**
+- SDK and docs for third-party integrations
+- Optional relayer for gasless withdrawals
+- Deeper Jupiter integration (limit orders, DCA in private state)
+
+**Later**
+- Governance and fee parameter tuning
+- Additional audits and circuit optimizations
+
+---
+
 ## Links
 
 - **App**: [swap.circuitx.live](https://swap.circuitx.live)
