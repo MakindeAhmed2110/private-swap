@@ -4,14 +4,26 @@ import { WalletButton } from "@/components/counter/WalletButton";
 import { PointsDisplay } from "@/components/points/PointsDisplay";
 import { SendPrivately } from "@/components/swap/SendPrivately";
 import { SwapPrivately } from "@/components/swap/SwapPrivately";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Shield, ArrowLeftRight, Menu, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
+const LG_BREAKPOINT = 1024;
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState<"send" | "swap">("send");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const m = window.matchMedia(`(max-width: ${LG_BREAKPOINT - 1}px)`);
+    setIsMobile(m.matches);
+    const handler = () => setIsMobile(m.matches);
+    m.addEventListener("change", handler);
+    return () => m.removeEventListener("change", handler);
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-black">
@@ -99,13 +111,27 @@ export default function Home() {
                     >
                       <span className="text-sm font-medium">Tokenomics</span>
                     </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLeaderboardOpen(true);
+                        setMobileMenuOpen(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-left text-gray-300 hover:bg-white hover:text-black transition-colors border-t border-gray-800"
+                    >
+                      <span className="text-sm font-medium">Leaderboard</span>
+                    </button>
                   </div>
                 </>
               )}
             </div>
 
             {/* Points + Wallet */}
-            <PointsDisplay />
+            <PointsDisplay
+              leaderboardOpen={leaderboardOpen}
+              onLeaderboardOpenChange={setLeaderboardOpen}
+              showLeaderboardTrigger={!isMobile}
+            />
             <div className="scale-90 sm:scale-100">
               <WalletButton />
             </div>
