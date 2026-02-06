@@ -44,7 +44,7 @@ export function PointsDisplay() {
 
   return (
     <div className="flex items-center gap-2">
-      <div className="hidden sm:flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-900/50 px-3 py-1.5 text-sm text-gray-300">
+      <div className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-900/50 px-2 sm:px-3 py-1.5 text-xs sm:text-sm text-gray-300">
         {loading && points === null ? (
           <span className="animate-pulse">...</span>
         ) : (
